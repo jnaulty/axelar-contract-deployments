@@ -4,6 +4,7 @@ const { saveConfig, getChainConfig } = require('../common/utils');
 const { loadConfig, printInfo, validateParameters, printWarn } = require('../common/utils');
 const { getSignedTx, storeSignedTx } = require('../evm/sign-utils');
 const { addBaseOptions, getWallet, getMultisig, signTransactionBlockBytes, broadcastSignature } = require('./utils');
+const { messageWithIntent } = require('@mysten/sui/cryptography');
 
 async function initMultisigConfig(chain, options) {
     const { base64PublicKeys, threshold } = options;
@@ -66,13 +67,23 @@ async function signTx(keypair, client, options) {
 
     const encodedTxBytes = fromB64(txData);
 
-    if (options.offline) {
-        const { signature, publicKey } = await signTransactionBlockBytes(keypair, client, encodedTxBytes, options);
-        return { ...txFileData, signedTx: signature, publicKey };
-    }
+    try {
+        if (options.offline) {
+            const { signature, publicKey } = await signTransactionBlockBytes(keypair, client, encodedTxBytes, options);
+            printInfo('Generated signature:', signature);
+            printInfo('Public key:', publicKey);
+            return { ...txFileData, signedTx: signature, publicKey };
+        }
 
-    await signTransactionBlockBytes(keypair, client, encodedTxBytes, options);
-    return {};
+        const result = await signTransactionBlockBytes(keypair, client, encodedTxBytes, options);
+        printInfo('Signature result:', result);
+        return {};
+    } catch (error) {
+        printWarn('Failed to sign transaction');
+        printWarn('Transaction bytes:', txData);
+        printWarn('Error details:', error.message);
+        throw error;
+    }
 }
 
 async function executeCombinedSignature(client, options) {

@@ -7,6 +7,7 @@ const { MultiSigPublicKey } = require('@mysten/sui/multisig');
 const { Secp256k1Keypair, Secp256k1PublicKey } = require('@mysten/sui/keypairs/secp256k1');
 const { Secp256r1Keypair, Secp256r1PublicKey } = require('@mysten/sui/keypairs/secp256r1');
 const { SuiClient, getFullnodeUrl } = require('@mysten/sui/client');
+const { messageWithIntent } = require('@mysten/sui/cryptography');
 const { fromB64, fromHEX } = require('@mysten/bcs');
 const { execute } = require('@axelar-network/axelar-cgp-sui');
 const { printInfo } = require('../../common/utils');
@@ -59,12 +60,6 @@ function getWallet(chain, options) {
 
         case 'mnemonic': {
             keypair = scheme.deriveKeypair(options.privateKey);
-            break;
-        }
-
-        case 'hex': {
-            const privKey = Buffer.from(options.privateKey, 'hex');
-            keypair = scheme.fromSecretKey(privKey);
             break;
         }
 
@@ -163,16 +158,17 @@ async function broadcastSignature(client, txBytes, signature, actionName) {
 }
 
 async function signTransactionBlockBytes(keypair, client, txBytes, options) {
-    const serializedSignature = (await keypair.signTransaction(txBytes)).signature;
+    const msgWithIntent = messageWithIntent("TransactionData", txBytes);
+    const serializedSignature = (await keypair.signTransaction(msgWithIntent)).signature;
 
-    let publicKey;
+    console.log("serialized signature:", serializedSignature);
+    console.log("txBytes:", txBytes);
 
-    console.log("serialized signature: ", serializedSignature);
+    const publicKey = await verifyTransactionSignature(txBytes, serializedSignature);
+    const keypairAddress = await keypair.toSuiAddress();
 
-    publicKey = await verifyTransactionSignature(txBytes, serializedSignature);
-
-    if (publicKey.toSuiAddress() !== keypair.toSuiAddress()) {
-        throw new Error(`Verification failed for address ${keypair.toSuiAddress()}`);
+    if (publicKey.toSuiAddress() !== keypairAddress) {
+        throw new Error(`Verification failed for address ${keypairAddress}`);
     }
 
     if (!options.offline) {
