@@ -6,6 +6,7 @@ const { Ed25519Keypair, Ed25519PublicKey } = require('@mysten/sui/keypairs/ed255
 const { MultiSigPublicKey } = require('@mysten/sui/multisig');
 const { Secp256k1Keypair, Secp256k1PublicKey } = require('@mysten/sui/keypairs/secp256k1');
 const { Secp256r1Keypair, Secp256r1PublicKey } = require('@mysten/sui/keypairs/secp256r1');
+const { messageWithIntent } = require('@mysten/sui/cryptography');
 const { SuiClient, getFullnodeUrl } = require('@mysten/sui/client');
 const { fromB64, fromHEX } = require('@mysten/bcs');
 const { execute } = require('@axelar-network/axelar-cgp-sui');
@@ -163,7 +164,8 @@ async function broadcastSignature(client, txBytes, signature, actionName) {
 }
 
 async function signTransactionBlockBytes(keypair, client, txBytes, options) {
-    const serializedSignature = (await keypair.signTransaction(txBytes)).signature;
+    const msgWithIntent = messageWithIntent("TransactionData", txBytes);
+    const serializedSignature = (await keypair.signTransaction(msgWithIntent)).signature;
 
     let publicKey;
 
